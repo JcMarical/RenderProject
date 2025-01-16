@@ -1,0 +1,105 @@
+﻿#pragma kernel CSMain
+
+#define GROUP_SIZE 256
+
+
+//hash函数
+float hash(float n)
+{
+    return frac(sin(n) * 43758.5453);
+}
+
+//返回一个-1到1的noise
+float noise1(float3 x)
+{
+    float3 p = floor(x);
+    float3 f = frac(x);
+
+    f = f * f * (3.0 - 2.0 * f);
+    float n = p.x + p.y * 57.0 + 113.0 * p.z;
+
+    return lerp(lerp(lerp(hash(n + 0.0), hash(n + 1.0), f.x),
+					lerp(hash(n + 57.0), hash(n + 58.0), f.x), f.y),
+				lerp(lerp(hash(n + 113.0), hash(n + 114.0), f.x),
+					lerp(hash(n + 170.0), hash(n + 171.0), f.x), f.y), f.z);
+}
+
+
+struct Boid
+{
+    float3 position;
+    float3 direction;
+    float noise_offset;
+};
+
+RWStructuredBuffer<Boid> boidsBuffer;
+
+float time;
+float deltaTime;
+float rotationSpeed;
+float boidSpeed;
+float boidSpeedVariation;
+float3 flockPosition;
+float neighbourDistance;
+int boidsCount;
+
+[numthreads(GROUP_SIZE, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+
+    uint instanceId = id.x;
+    Boid boid = boidsBuffer[instanceId];
+
+    float noise = clamp(noise1(time / 100.0 + boid.noise_offset), -1, 1) * 2.0 - 1.0;//噪声映射到[0,1]
+    float velocity = boidSpeed * (1.0 + noise * boidSpeedVariation);//通过噪声计算速度
+    
+    float3 boid_pos = boid.position;
+    float3 boid_dir = boid.direction;
+    
+    float3 separation = 0; // 分离
+    float3 alignment = 0; // 对齐 - 方向
+    float3 cohesion = flockPosition; // 聚合 - 位置
+
+    uint nearbyCount = 1; // 自身算作周边的个体。
+
+    for (uint i = 0; i < (uint)boidsCount; i++)
+    {
+        if (i == instanceId)
+            continue;
+
+        // 计算周围范围内的个体
+        if (distance(boid.position, boidsBuffer[i].position) < neighbourDistance)
+        {
+            float3 tempBoid_position = boidsBuffer[i].position;
+            
+            float3 offset = boid.position - tempBoid_position;
+            float dist = length(offset);
+            if (dist < neighbourDistance)
+            {
+                dist = max(dist, 0.000001); //避免除以0
+                separation += offset * (1.0 / dist - 1.0 / neighbourDistance);
+            }
+            alignment +=  boidsBuffer[i].direction;
+            cohesion += tempBoid_position;
+            nearbyCount++;
+        }
+        
+    }
+
+    float avg = 1.0 / nearbyCount;
+    alignment *= avg;
+    cohesion *= avg;
+    cohesion = normalize(cohesion - boid.position);
+
+    // 综合一个移动方向
+    float3 direction = alignment + separation + cohesion;
+    
+    // 平滑转向和位置更新
+    float ip = exp(-rotationSpeed * deltaTime); 
+    boid.direction = lerp((direction), normalize(boid_dir), ip);
+
+    // deltaTime确保移动速度不会因帧率变化而改变。
+    boid.position += boid.direction * velocity * deltaTime;
+
+    boidsBuffer[id.x] = boid;
+}

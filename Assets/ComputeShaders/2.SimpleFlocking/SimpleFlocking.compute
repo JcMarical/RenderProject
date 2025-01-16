@@ -1,0 +1,72 @@
+﻿#pragma kernel CSMain
+
+#define GROUP_SIZE 256
+
+struct Boid
+{
+    float3 position;
+    float3 direction;
+};
+
+RWStructuredBuffer<Boid> boidsBuffer;
+
+float time;
+float deltaTime;
+float rotationSpeed;
+float boidSpeed;
+float boidSpeedVariation;
+float3 flockPosition;
+float neighbourDistance;
+int boidsCount;
+
+[numthreads(GROUP_SIZE, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    Boid boid = boidsBuffer[id.x];
+
+    float3 separation = 0; // 分离
+    float3 alignment = 0; // 对齐 - 方向
+    float3 cohesion = flockPosition; // 聚合 - 位置
+
+    uint nearbyCount = 1; // 自身算作周边的个体。
+
+    for (int i = 0; i < boidsCount; i++)
+    {
+        if (i != (int) id.x) // 把自己排除 
+        {
+            Boid temp = boidsBuffer[i];
+            // 计算周围范围内的个体
+            if (distance(boid.position, temp.position) < neighbourDistance)
+            {
+                float3 offset = boid.position - temp.position;
+                float dist = length(offset);
+                if (dist < neighbourDistance)
+                {
+                    dist = max(dist, 0.000001);
+                    separation += offset * (1.0 / dist - 1.0 / neighbourDistance);
+                }
+                alignment += temp.direction;
+                cohesion += temp.position;
+                nearbyCount++;
+            }
+        }
+    }
+    
+    //Unity3d的GroupMemoryBarrierWithGroupSync()是一个GPU端的同步函数，它在Compute Shader中使用。该函数将组内线程的执行顺序同步，并确保之前写入全局内存的所有数据都被读取和处理完毕。
+
+    //具体来说， GroupMemoryBarrierWithGroupSync会阻止当前组中的线程继续执行， 直到组内所有线程都达到该点。 然后， 它会确保之前写入全局内存的所有数据都被读取和处理完毕。此时， 才允许当前组中的线程继续执行下一步操作。
+    GroupMemoryBarrierWithGroupSync();
+    float avg = 1.0 / nearbyCount;
+    alignment *= avg;
+    cohesion *= avg;
+    cohesion = normalize(cohesion - boid.position);
+
+    // 综合一个移动方向
+    float3 direction = alignment + separation + cohesion;
+    // 平滑转向和位置更新
+    boid.direction = lerp(direction, normalize(boid.direction), 0.94);
+    // deltaTime确保移动速度不会因帧率变化而改变。
+    boid.position += boid.direction * boidSpeed * deltaTime;
+
+    boidsBuffer[id.x] = boid;
+}
