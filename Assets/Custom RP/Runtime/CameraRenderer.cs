@@ -19,7 +19,14 @@ public partial class CameraRenderer
     CullingResults cullingResults;
 
     //着色器标签ID（目前只提供无光照着色器）
-    static ShaderTagId unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit");
+    static ShaderTagId
+        unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit"),
+        litShaderTagId = new ShaderTagId("CustomLit");      //光照标签设置
+
+
+    //光照设置
+    Lighting lighting = new Lighting();
+
 
     //渲染设置
     public void Render(ScriptableRenderContext context, Camera camera,bool useDynamicBatching, bool useGPUInstancing)
@@ -37,6 +44,7 @@ public partial class CameraRenderer
         }
 
         Setup();    //设置
+        lighting.Setup(context,cullingResults);
         DrawVisibleGeometry(useDynamicBatching,useGPUInstancing);   //绘制几何
         DrawUnsupportedShaders(); //绘制旧版着色器与几何
         DrawGizmos();
@@ -46,10 +54,10 @@ public partial class CameraRenderer
     //初始设置
     void Setup()
     {
-        context.SetupCameraProperties(camera);//设置View-Peojection矩阵
+        context.SetupCameraProperties(camera);                                                  //设置View-Peojection矩阵
         CameraClearFlags flags = camera.clearFlags;
         buffer.ClearRenderTarget(
-            flags <= CameraClearFlags.Depth, //Skybox,Color,Depth,Nothing
+            flags <= CameraClearFlags.Depth,                                                    //Skybox,Color,Depth,Nothing
             flags <= CameraClearFlags.Color,
             flags == CameraClearFlags.Color ?
                 camera.backgroundColor.linear : Color.clear
@@ -72,13 +80,17 @@ public partial class CameraRenderer
             enableDynamicBatching = useDynamicBatching,
             enableInstancing = useGPUInstancing
         };
+
+
+        drawingSettings.SetShaderPassName(1, litShaderTagId);                                      //光照Lit开启Tag
+
         var filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
 
         context.DrawRenderers(
             cullingResults, ref drawingSettings, ref filteringSettings
         );
         //-----------------------------------
-        context.DrawSkybox(camera);        //绘制天空盒
+        context.DrawSkybox(camera);                                                                 //绘制天空盒
 
         //-----------透明物体-----------------
         sortingSettings.criteria = SortingCriteria.CommonTransparent;

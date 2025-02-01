@@ -1,4 +1,4 @@
-Shader "Custom RP/Unlit"
+Shader "Custom RP/Lit"
 {
     Properties
     {
@@ -16,6 +16,14 @@ Shader "Custom RP/Unlit"
 
         //深度写入
         [Enum(Off, 0, On, 1)] _ZWrite ("Z Write", Float) = 1 //深度写入开关
+    
+        //表面特性
+        _Metallic ("Metallic",Range(0,1)) = 0
+        _Smoothness ("Smoothness",Range(0,1)) = 0.5
+
+        //漫反射预乘Alpha
+        [Toggle(_PREMULTIPLY_ALPHA)] _PremulAlpha ("Premultiply Alpha", Float) = 0
+    
     }
 
     SubShader
@@ -26,26 +34,37 @@ Shader "Custom RP/Unlit"
 
         Pass
         {
+            Tags {
+                "LightMode" = "CustomLit"
+            }
+
+
             Blend [_SrcBlend] [_DstBlend]
             ZWrite [_ZWrite]
 
             HLSLPROGRAM
 
+            //避免编译OPENGL ES 2.0及以下的着色器变体
+            #pragma target 3.5
+
             //Shader Feature
             //裁切开关（生成不同的Shader变体）
-            #pragma shader_feature _CLIPPING 
+            #pragma shader_feature _CLIPPING    
+            //透明漫反射是否乘以alpha
+            #pragma shader_feature _PREMULTIPLY_ALPHA 
 
             #pragma multi_compile_instancing
             //名称识别着色器程序
-            #pragma vertex UnlitPassVertex      
-            #pragma fragment UnlitPassFragment
+            #pragma vertex LitPassVertex      
+            #pragma fragment LitPassFragment
             
             //同一文件夹下的 着色器内核Shader Kernels
-            #include "UnlitPass.hlsl"
+            #include "LitPass.hlsl"
 
             ENDHLSL
         }
     }
 
+    //编辑器绘制对应类的检查器
     CustomEditor "CustomShaderGUI"
 }

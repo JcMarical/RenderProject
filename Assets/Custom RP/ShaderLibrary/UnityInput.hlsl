@@ -8,6 +8,7 @@ CBUFFER_START(UnityPerDraw)
     real4 unity_WorldTransformParams; //real4是别名
 CBUFFER_END
 
+float3 _WorldSpaceCameraPos;//相机位置（用于计算镜面光）
 
 float4x4 unity_MatrixVP;
 float4x4 unity_MatrixV;
