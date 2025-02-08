@@ -3,6 +3,7 @@
 
 #include "../ShaderLibrary/Common.hlsl"
 #include "../ShaderLibrary/Surface.hlsl"
+#include "../ShaderLibrary/Shadows.hlsl"
 #include "../ShaderLibrary/Light.hlsl"
 #include "../ShaderLibrary/BRDF.hlsl"
 #include "../ShaderLibrary/Lighting.hlsl"
@@ -11,18 +12,6 @@
 //纹理上传和采样
 TEXTURE2D(_BaseMap);
 SAMPLER(sampler_BaseMap);//Wrap和Filter
-
-//这种方法有些平台是无法兼容的
-//cbuffer UnityPerMaterial {
-//   float4 _BaseColor;
-//}
-
-//使用宏来设置常量缓冲区
-/*
-CBUFFER_START(UnityPerMaterial)
-	float4 _BaseColor;
-CBUFFER_END
-*/
 
 // GPUInstancing的常量缓冲区
 UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
@@ -100,13 +89,15 @@ float4 LitPassFragment(Varyings input) : SV_TARGET
 
     //Surface表面处理
     Surface surface;
+    surface.position = input.positionWS;
     surface.normal = normalize(input.normalWS);
     surface.viewDirection = normalize(_WorldSpaceCameraPos - input.positionWS);
+    surface.depth = -TransformWorldToView(input.positionWS).z;
     surface.color = base.rgb;
     surface.alpha = base.a;
     surface.metallic = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Metallic);
 	surface.smoothness = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Smoothness);
-
+	surface.dither = InterleavedGradientNoise(input.positionCS.xy, 0);  //生成抖动值
 
 
     //Light光照处理

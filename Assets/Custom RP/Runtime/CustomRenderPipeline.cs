@@ -6,11 +6,15 @@ public class CustomRenderPipeline : RenderPipeline
 {
     bool useDynamicBatching, useGPUInstancing;
 
+    ShadowSettings shadowSettings;
+
     //设置渲染相机渲染器
 	CameraRenderer renderer = new CameraRenderer();
 
-    public CustomRenderPipeline(bool useDynamicBatching, bool useGPUInstancing, bool useSRPBatcher)
+    public CustomRenderPipeline(bool useDynamicBatching, bool useGPUInstancing, bool useSRPBatcher,
+        ShadowSettings shadowSettings)
     {
+        this.shadowSettings = shadowSettings;
         this.useDynamicBatching = useDynamicBatching;
         this.useGPUInstancing = useGPUInstancing;
         GraphicsSettings.useScriptableRenderPipelineBatching = useSRPBatcher; //SRP着色器开关
@@ -28,7 +32,7 @@ public class CustomRenderPipeline : RenderPipeline
     {
         for (int i = 0; i < cameras.Count; i++)
         {
-            renderer.Render(context, cameras[i], useDynamicBatching, useGPUInstancing);
+            renderer.Render(context, cameras[i], useDynamicBatching, useGPUInstancing,shadowSettings);
         }
     }
 }

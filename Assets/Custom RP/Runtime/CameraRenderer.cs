@@ -29,7 +29,8 @@ public partial class CameraRenderer
 
 
     //渲染设置
-    public void Render(ScriptableRenderContext context, Camera camera,bool useDynamicBatching, bool useGPUInstancing)
+    public void Render(ScriptableRenderContext context, Camera camera,bool useDynamicBatching, bool useGPUInstancing,
+        ShadowSettings shadowSettings)
     {
         this.context = context;
         this.camera = camera;
@@ -38,16 +39,25 @@ public partial class CameraRenderer
 
         //UI会向场景添加几何体，因此需要在剔除前完成
         PrepareForSceneWindow();    //UI绘制
-        if (!Cull())
+        if (!Cull(shadowSettings.maxDistance))
         {
             return;
         }
 
+
+        //帧调试器单独显示阴影条目
+        buffer.BeginSample(SampleName);
+        ExecuteBuffer();
+        lighting.Setup(context,cullingResults,shadowSettings);
+        buffer.EndSample(SampleName);
+
+        //先设置阴影再渲染常规几何体
+
         Setup();    //设置
-        lighting.Setup(context,cullingResults);
         DrawVisibleGeometry(useDynamicBatching,useGPUInstancing);   //绘制几何
         DrawUnsupportedShaders(); //绘制旧版着色器与几何
         DrawGizmos();
+        lighting.Cleanup();
         Submit();   //提交 
     }
 
@@ -120,12 +130,13 @@ public partial class CameraRenderer
     }
 
     //剔除
-    bool Cull()
+    bool Cull(float maxShadowDistance)
     {
 
         //ScriptableCullingParameters p;
         if (camera.TryGetCullingParameters(out ScriptableCullingParameters p))
         {
+            p.shadowDistance = Mathf.Min(maxShadowDistance,camera.farClipPlane);
             cullingResults = context.Cull(ref p);
             return true;
         }
