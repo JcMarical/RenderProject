@@ -29,14 +29,27 @@ Shader "Custom RP/Lit"
 
         //漫反射预乘Alpha
         [Toggle(_PREMULTIPLY_ALPHA)] _PremulAlpha ("Premultiply Alpha", Float) = 0
+
+
+        //自发光
+        [NoScaleOffset] _EmissionMap("Emission", 2D) = "white" {}
+        [HDR] _EmissionColor("Emission", Color) = (0.0, 0.0, 0.0 ,0.0)
+
+        //烘焙透明度，Unity这两个属性是硬编码的需求，所以隐藏了
+        [HideInInspector] _MainTex("Texture for Lightmap", 2D) = "white" {}
+		[HideInInspector] _Color("Color for Lightmap", Color) = (0.5, 0.5, 0.5, 1.0)
     
     }
 
     SubShader
     {
+        //所有shader都要使用的库
+		HLSLINCLUDE
+		#include "../ShaderLibrary/Common.hlsl"
+		#include "LitInput.hlsl"
+		ENDHLSL
+		
 
-
-    
 
         Pass
         {
@@ -64,7 +77,9 @@ Shader "Custom RP/Lit"
 			#pragma multi_compile _ _DIRECTIONAL_PCF3 _DIRECTIONAL_PCF5 _DIRECTIONAL_PCF7
             //级联混合模式
             #pragma multi_compile _ _CASCADE_BLEND_SOFT _CASCADE_BLEND_DITHER
-
+            //光照贴图
+            #pragma multi_compile _ LIGHTMAP_ON
+            //GPUInstance
             #pragma multi_compile_instancing
             //名称识别着色器程序
             #pragma vertex LitPassVertex      
@@ -94,6 +109,22 @@ Shader "Custom RP/Lit"
 			#include "ShadowCasterPass.hlsl"
             ENDHLSL
         }
+
+
+                Pass {
+			Tags {
+				"LightMode" = "Meta"
+			}
+
+			Cull Off
+
+			HLSLPROGRAM
+			#pragma target 3.5
+			#pragma vertex MetaPassVertex
+			#pragma fragment MetaPassFragment
+			#include "MetaPass.hlsl"
+			ENDHLSL
+		}
     }
 
     //编辑器绘制对应类的检查器

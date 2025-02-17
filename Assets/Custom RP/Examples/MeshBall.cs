@@ -17,6 +17,8 @@ public class MeshBall : MonoBehaviour
     [SerializeField]
     Material material = default;
 
+    [SerializeField]
+    LightProbeProxyVolume lightProbeVolume = null;
 
     //一次可以提供多达1023个实例
     Matrix4x4[] matrices = new Matrix4x4[1023];
@@ -25,6 +27,7 @@ public class MeshBall : MonoBehaviour
         metallic = new float[1023],
         smoothness = new float[1023];
 
+    
 
     MaterialPropertyBlock block;
 
@@ -33,11 +36,11 @@ public class MeshBall : MonoBehaviour
         for (int i = 0; i < matrices.Length; i++)
         {
             matrices[i] = Matrix4x4.TRS(
-                Random.insideUnitSphere * 10f,
+                transform.position + Random.insideUnitSphere * 50f,
                 Quaternion.Euler(
                 Random.value * 360f, Random.value * 360f, Random.value * 360f
                 ),
-                Vector3.one * Random.Range(0.5f, 1.5f)
+                Vector3.one * Random.Range(4.5f, 5.5f)
             );
             baseColors[i] =
                 new Vector4(Random.value, Random.value, Random.value, 
@@ -56,9 +59,32 @@ public class MeshBall : MonoBehaviour
             block.SetVectorArray(baseColorId, baseColors);
             block.SetFloatArray(metallicId, metallic);
             block.SetFloatArray(smoothnessId, smoothness);
+
+            //手动插值光照探针
+
+            if (!lightProbeVolume)
+            {
+                    var positions = new Vector3[1023];
+                for (int i = 0; i < matrices.Length; i++)
+                {
+                    positions[i] = matrices[i].GetColumn(3);//将第四列提出来
+                }
+                var lightProbes = new SphericalHarmonicsL2[1023];
+                LightProbes.CalculateInterpolatedLightAndOcclusionProbes(
+                    positions, lightProbes, null
+                );//光照探针计算
+                block.CopySHCoefficientArraysFrom(lightProbes);//将光照探针复制到块中
+            }
+
         }
+
+
         //批绘制
-        Graphics.DrawMeshInstanced(mesh, 0, material, matrices, 1023, block);
+        Graphics.DrawMeshInstanced(mesh, 0, material, matrices, 1023, block,
+            ShadowCastingMode.On, true, 0, null, 
+            lightProbeVolume ?
+                LightProbeUsage.UseProxyVolume : LightProbeUsage.CustomProvided,    //使用光照探针还是LPPV
+            lightProbeVolume);//MeshRenderer的相关设置
         
         //光照转换到线性空间
         GraphicsSettings.lightsUseLinearIntensity = true;

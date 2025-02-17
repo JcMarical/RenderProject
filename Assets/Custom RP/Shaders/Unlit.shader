@@ -16,13 +16,19 @@ Shader "Custom RP/Unlit"
 
         //深度写入
         [Enum(Off, 0, On, 1)] _ZWrite ("Z Write", Float) = 1 //深度写入开关
+
+        //自发光
+        [HDR] _BaseColor("Color", Color) = (1.0, 1.0, 1.0, 1.0)
     }
 
     SubShader
     {
+		HLSLINCLUDE
+		#include "../ShaderLibrary/Common.hlsl"
+		#include "UnlitInput.hlsl"
+		ENDHLSL
 
 
-    
 
         Pass
         {
@@ -45,6 +51,21 @@ Shader "Custom RP/Unlit"
 
             ENDHLSL
         }
+
+                Pass {
+			Tags {
+				"LightMode" = "Meta"
+			}
+
+			Cull Off
+
+			HLSLPROGRAM
+			#pragma target 3.5
+			#pragma vertex MetaPassVertex
+			#pragma fragment MetaPassFragment
+			#include "MetaPass.hlsl"
+			ENDHLSL
+		}
     }
 
     CustomEditor "CustomShaderGUI"

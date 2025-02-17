@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Custom RP_Unlit
+  m_Name: unlit
   m_Shader: {fileID: 4800000, guid: d7720f4fcc009b242aa4e9566bdc5c9b, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -31,7 +31,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _Clipping: 1
-    - _Cutoff: 0.536
+    - _Cutoff: 0.319
     - _DstBlend: 10
     - _SrcBlend: 5
     - _ZWrite: 1

@@ -32,11 +32,7 @@ CBUFFER_START(_CustomShadows)
     float4 _ShadowDistanceFade;
 CBUFFER_END
 
-struct DirectionalShadowData {
-	float strength;
-	int tileIndex;
-    float normalBias;
-};
+
 
 struct ShadowData {
 	int cascadeIndex;
@@ -44,6 +40,11 @@ struct ShadowData {
     float strength;
 };
 
+struct DirectionalShadowData {
+	float strength;
+	int tileIndex;
+    float normalBias;
+};
 //阴影淡化
 float FadedShadowStrength (float distance, float scale, float fade)
 {
@@ -54,6 +55,7 @@ float FadedShadowStrength (float distance, float scale, float fade)
 ShadowData GetShadowData (Surface surfaceWS) {
 	ShadowData data;
     //不仅需要球体去剔除，也需要深度去剔除(后改为根据深度淡化)
+    	data.cascadeBlend = 1.0;
     data.strength = FadedShadowStrength(surfaceWS.depth, _ShadowDistanceFade.x, _ShadowDistanceFade.y);
     //遍历所有级联剔除球体，直到找到包含表面位置的球体。
     //然后就使用当前循环迭代器作为级联索引。
@@ -79,19 +81,16 @@ ShadowData GetShadowData (Surface surfaceWS) {
 	}
 
     //如果在级联范围内，strength则为0
-    if(i == _CascadeCount){
-        data.strength = 0.0;
-    }
-
-    //级联抖动设置
-    #if defined(_CASCADE_BLEND_DITHER)
+    if (i == _CascadeCount) {
+		data.strength = 0.0;
+	}
+	#if defined(_CASCADE_BLEND_DITHER)
 		else if (data.cascadeBlend < surfaceWS.dither) {
-			i += 1; //小于抖动值，则换到下一级联，形成混合的效果
+			i += 1;
 		}
 	#endif
-    #if !defined(_CASCADE_BLEND_SOFT)
+	#if !defined(_CASCADE_BLEND_SOFT)
 		data.cascadeBlend = 1.0;
-    
 	#endif
 	data.cascadeIndex = i;
 	return data;

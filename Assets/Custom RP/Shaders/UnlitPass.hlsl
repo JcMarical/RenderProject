@@ -3,9 +3,7 @@
 
 #include "../ShaderLibrary/Common.hlsl"
 
-//纹理上传和采样
-TEXTURE2D(_BaseMap);
-SAMPLER(sampler_BaseMap);//Wrap和Filter
+
 
 //这种方法有些平台是无法兼容的
 //cbuffer UnityPerMaterial {
@@ -19,13 +17,6 @@ CBUFFER_START(UnityPerMaterial)
 CBUFFER_END
 */
 
-// GPUInstancing的常量缓冲区
-UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
-	//	float4 _BaseColor;
-	UNITY_DEFINE_INSTANCED_PROP(float4, _BaseMap_ST)//平铺和偏移
-	UNITY_DEFINE_INSTANCED_PROP(float4, _BaseColor)
-    UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)    //透明裁切
-UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
 
 

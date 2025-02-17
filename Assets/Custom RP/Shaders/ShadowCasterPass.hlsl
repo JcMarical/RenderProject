@@ -3,16 +3,7 @@
 
 #include "../ShaderLibrary/Common.hlsl"
 
-//纹理上传和采样
-TEXTURE2D(_BaseMap);
-SAMPLER(sampler_BaseMap);//Wrap和Filter
 
-// GPUInstancing的常量缓冲区
-UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
-	UNITY_DEFINE_INSTANCED_PROP(float4, _BaseMap_ST)
-	UNITY_DEFINE_INSTANCED_PROP(float4, _BaseColor)
-	UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
-UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
 
 
@@ -47,18 +38,18 @@ Varyings ShadowCasterPassVertex(Attributes input)
     
 
     //常规纹理设置
-    float4 baseST = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseMap_ST);
-	output.baseUV = input.baseUV * baseST.xy + baseST.zw;
+	//float4 baseST = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseMap_ST);
+	output.baseUV = TransformBaseUV(input.baseUV);
 	return output;
 }
 
 void ShadowCasterPassFragment (Varyings input) {
 	UNITY_SETUP_INSTANCE_ID(input);
-	float4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV);
-	float4 baseColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseColor);
-	float4 base = baseMap * baseColor;
+	//float4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV);
+	//float4 baseColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseColor);
+	float4 base = GetBase(input.baseUV);
 	#if defined(_SHADOWS_CLIP)
-		clip(base.a - UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Cutoff));
+		clip(base.a - GetCutoff(input.baseUV));
 	#elif defined(_SHADOWS_DITHER)
 		float dither = InterleavedGradientNoise(input.positionCS.xy, 0);
 		clip(base.a - dither);
