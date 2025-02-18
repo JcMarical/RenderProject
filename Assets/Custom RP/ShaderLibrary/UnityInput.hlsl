@@ -7,6 +7,9 @@ CBUFFER_START(UnityPerDraw)
     float4 unity_LODFade;
     real4 unity_WorldTransformParams; //real4是别名
 
+    //遮挡探针
+    float4 unity_ProbesOcclusion;
+
     //GI的LightMapUV变换
 	float4 unity_LightmapST;
 	float4 unity_DynamicLightmapST;

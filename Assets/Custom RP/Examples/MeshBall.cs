@@ -70,10 +70,12 @@ public class MeshBall : MonoBehaviour
                     positions[i] = matrices[i].GetColumn(3);//将第四列提出来
                 }
                 var lightProbes = new SphericalHarmonicsL2[1023];
+                var occlusionProbes = new Vector4[1023];    //遮挡探针数据
                 LightProbes.CalculateInterpolatedLightAndOcclusionProbes(
-                    positions, lightProbes, null
-                );//光照探针计算
+                    positions, lightProbes, occlusionProbes
+                );//光照、遮挡探针计算
                 block.CopySHCoefficientArraysFrom(lightProbes);//将光照探针复制到块中
+                block.CopyProbeOcclusionArrayFrom(occlusionProbes); //遮挡探针
             }
 
         }

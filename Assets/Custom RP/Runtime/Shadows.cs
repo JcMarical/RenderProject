@@ -19,10 +19,13 @@ public class Shadows
 
     #endregion
 
-    #region 阴影
-        ShadowSettings settings;
+    
 
-        const int maxShadowedDirectionalLightCount = 4, maxCascades = 4;  //允许产生阴影的光源数量以及级联阴影数
+
+    #region 阴影
+    ShadowSettings settings;
+
+        const int maxShadowedDirLightCount = 4, maxCascades = 4;  //允许产生阴影的光源数量以及级联阴影数
 
         struct ShadowedDirectionalLight
         {
@@ -32,7 +35,7 @@ public class Shadows
     }
 
         ShadowedDirectionalLight[] ShadowedDirectionalLights = 
-            new ShadowedDirectionalLight[maxShadowedDirectionalLightCount ];
+            new ShadowedDirectionalLight[maxShadowedDirLightCount];
 
 
         int ShadowedDirectionalLightCount = 0;
@@ -58,7 +61,7 @@ public class Shadows
 
     //阴影变换矩阵集
     static Matrix4x4[]
-        dirShadowMatrices = new Matrix4x4[maxShadowedDirectionalLightCount * maxCascades];
+        dirShadowMatrices = new Matrix4x4[maxShadowedDirLightCount * maxCascades];
 
 
     //PCF设置
@@ -78,6 +81,18 @@ public class Shadows
     #endregion
 
 
+    #region ShadowMask
+    static string[] shadowMaskKeywords = {
+        "_SHADOW_MASK_ALWAYS",
+        "_SHADOW_MASK_DISTANCE"
+    };
+
+    bool useShadowMask;
+
+
+
+    #endregion
+
     #region API
     public void Setup(
         ScriptableRenderContext context, CullingResults cullingResults,
@@ -88,15 +103,40 @@ public class Shadows
         this.cullingResults = cullingResults;
         this.settings = settings;
         ShadowedDirectionalLightCount = 0;
+
+        useShadowMask = false;
     }
 
     //保存光源阴影信息
     public Vector3 ReserveDirectionalShadows(Light light, int visibleLightIndex)
     {
-        if (ShadowedDirectionalLightCount < maxShadowedDirectionalLightCount &&
-            light.shadows != LightShadows.None && light.shadowStrength > 0f&&                         //不可见或没有阴影值
-            cullingResults.GetShadowCasterBounds(visibleLightIndex, out Bounds b))                    //出边界，剔除
+        if (ShadowedDirectionalLightCount < maxShadowedDirLightCount &&
+            light.shadows != LightShadows.None && light.shadowStrength > 0f )                        //不可见或没有阴影值
+                               
         {
+            float maskChannel = -1;
+
+            //阴影遮罩设置
+            LightBakingOutput lightBaking = light.bakingOutput;
+            if (
+                lightBaking.lightmapBakeType == LightmapBakeType.Mixed &&
+                lightBaking.mixedLightingMode == MixedLightingMode.Shadowmask
+            )
+            {
+                useShadowMask = true;
+                maskChannel = lightBaking.occlusionMaskChannel;
+            }
+            //本来是出边界，剔除跳过阴影
+            if (!cullingResults.GetShadowCasterBounds(
+                visibleLightIndex, out Bounds b
+            ))
+            {
+                //后面需要确定是否使用阴影遮罩，再确定是否没有阴影投射物
+                return new Vector4(-light.shadowStrength, 0f, 0f, maskChannel);      //但是阴影强度大于0，着色器将对阴影贴图采样，所以使用负阴影强度
+            }
+
+
+
             ShadowedDirectionalLights[ShadowedDirectionalLightCount] =
                 new ShadowedDirectionalLight
                 {
@@ -104,13 +144,13 @@ public class Shadows
                     slopeScaleBias = light.shadowBias,   //运用灯光配置
                     nearPlaneOffset = light.shadowNearPlane
                 };
-            return new Vector3(
+            return new Vector4(
                 light.shadowStrength, 
                 settings.directional.cascadeCount * ShadowedDirectionalLightCount++,
-                light.shadowNormalBias
+                light.shadowNormalBias, maskChannel
             );
         }
-        return Vector3.zero;
+        return new Vector4(0f, 0f, 0f, -1f);
     }
 
     public void Render()
@@ -127,6 +167,14 @@ public class Shadows
                 32, FilterMode.Bilinear, RenderTextureFormat.Shadowmap
             );
         }
+
+        //ShadowMasks设置关键字
+        buffer.BeginSample(bufferName);
+        SetKeywords(shadowMaskKeywords, useShadowMask?
+            QualitySettings.shadowmaskMode == ShadowmaskMode.Shadowmask ? 0 : 1: -1);
+        buffer.EndSample(bufferName);
+        ExecuteBuffer();
+
     }
 
     void RenderDirecionalShadows()
@@ -162,6 +210,7 @@ public class Shadows
             cascadeCullingSpheresId, cascadeCullingSpheres
         );
 
+        buffer.SetGlobalVectorArray(cascadeDataId, cascadeData);            //发送级联数据
         buffer.SetGlobalMatrixArray(dirShadowMatricesId, dirShadowMatrices);
         //发送阴影淡化信息
         float f = 1f - settings.directional.cascadeFade;
@@ -172,7 +221,7 @@ public class Shadows
             )
         );
 
-        buffer.SetGlobalVectorArray(cascadeDataId, cascadeData);            //发送级联数据
+
 
         SetKeywords(directionalFilterKeywords, (int)settings.directional.filter - 1);   //PCF
         SetKeywords(cascadeBlendKeywords, (int)settings.directional.cascadeBlend - 1);  //级联混合模式

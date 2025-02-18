@@ -1,6 +1,8 @@
 #ifndef CUSTOM_COMMON_INCLUDED
 #define CUSTOM_COMMON_INCLUDED
 
+
+
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 //计算粗糙度...
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl" 
@@ -16,6 +18,9 @@
 #define UNITY_PREV_MATRIX_I_M unity_prev_MatrixIM
 #define UNITY_MATRIX_P glstate_matrix_projection
 
+#if defined(_SHADOW_MASK_ALWAYS) || defined(_SHADOW_MASK_DISTANCE)
+	#define SHADOWS_SHADOWMASK
+#endif
 
 //作用：重新定义这些宏，提供一些方法
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"

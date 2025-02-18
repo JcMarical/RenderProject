@@ -27,23 +27,29 @@ CBUFFER_START(_CustomShadows)
     int _CascadeCount;
     float4 _CascadeCullingSpheres[MAX_CASCADE_COUNT];
     float4 _CascadeData[MAX_CASCADE_COUNT];
-	float4x4 _DirectionalShadowMatrices[MAX_SHADOWED_DIRECTIONAL_LIGHT_COUNT];
+	float4x4 _DirectionalShadowMatrices[MAX_SHADOWED_DIRECTIONAL_LIGHT_COUNT* MAX_CASCADE_COUNT];
     float4 _ShadowAtlasSize;
     float4 _ShadowDistanceFade;
 CBUFFER_END
 
-
+struct ShadowMask {
+	bool always;
+	bool distance;
+	float4 shadows;
+};
 
 struct ShadowData {
 	int cascadeIndex;
     float cascadeBlend;
     float strength;
+	ShadowMask shadowMask;
 };
 
 struct DirectionalShadowData {
 	float strength;
 	int tileIndex;
     float normalBias;
+	int shadowMaskChannel;
 };
 //阴影淡化
 float FadedShadowStrength (float distance, float scale, float fade)
@@ -54,8 +60,13 @@ float FadedShadowStrength (float distance, float scale, float fade)
 
 ShadowData GetShadowData (Surface surfaceWS) {
 	ShadowData data;
+	//ShadowMask
+	data.shadowMask.always = false;
+	//ShadowMaskDistance处理
+	data.shadowMask.distance = false;
+	data.shadowMask.shadows = 1.0;
     //不仅需要球体去剔除，也需要深度去剔除(后改为根据深度淡化)
-    	data.cascadeBlend = 1.0;
+    data.cascadeBlend = 1.0;
     data.strength = FadedShadowStrength(surfaceWS.depth, _ShadowDistanceFade.x, _ShadowDistanceFade.y);
     //遍历所有级联剔除球体，直到找到包含表面位置的球体。
     //然后就使用当前循环迭代器作为级联索引。
@@ -123,18 +134,11 @@ float FilterDirectionalShadow (float3 positionSTS) {
 	#endif
 }
 
-//阴影衰减
-float GetDirecitonalShadowAttenuation (DirectionalShadowData directional,ShadowData global, Surface surfaceWS){
-    //接受阴影
-    #if !defined(_RECEIVE_SHADOWS)
-		return 1.0;
-	#endif
-    
-    //阴影强度为0时，完全不需要采样，我们有一个无阴影的光源
-	if (directional.strength <= 0.0) {
-		return 1.0;
-	}   
 
+//获取级联阴影
+float GetCascadedShadow (
+	DirectionalShadowData directional, ShadowData global, Surface surfaceWS
+) {
     //bias设置
     float3 normalBias = surfaceWS.normal * (directional.normalBias * _CascadeData[global.cascadeIndex].y);
     //阴影矩阵X表面位置
@@ -156,11 +160,71 @@ float GetDirecitonalShadowAttenuation (DirectionalShadowData directional,ShadowD
 			FilterDirectionalShadow(positionSTS), shadow, global.cascadeBlend
 		);
 	}
-    //强度为0，光照完全不受阴影影响，应该为1。
-    return lerp(1.0, shadow, directional.strength);
-    
+		return shadow;
 }
 
+//获取烘焙阴影
+float GetBakedShadow (ShadowMask mask, int channel) {
+	float shadow = 1.0;
+	if (mask.always || mask.distance) {
+		if (channel >= 0) {
+			shadow = mask.shadows[channel];
+		}
+	}
+	return shadow;
+}
+
+//混合烘焙和实时阴影
+float MixBakedAndRealtimeShadows (
+	ShadowData global, float shadow, int shadowMaskChannel,float strength
+) {
+	float baked = GetBakedShadow(global.shadowMask, shadowMaskChannel);
+	//shadowMask ：取最小值来组合烘焙阴影和实时阴影。
+	if (global.shadowMask.always) {
+		shadow = lerp(1.0, shadow, global.strength);
+		shadow = min(baked, shadow);
+		return lerp(1.0, shadow, strength);
+	}
+	//ShadowMaskDistance
+	if (global.shadowMask.distance) {
+		shadow = lerp(baked, shadow, global.strength);
+		return lerp(1.0, shadow, strength);
+	}
+	return lerp(1.0, shadow, strength * global.strength);	 //强度为0，光照完全不受阴影影响，应该为1。
+}
+
+//仅烘焙阴影遮罩
+float GetBakedShadow (ShadowMask mask, int channel, float strength) {
+	//没有开启阴影遮罩则直接无阴影
+	if (mask.always || mask.distance) {
+		return lerp(1.0, GetBakedShadow(mask, channel), strength);
+	}
+	return 1.0;
+}
+
+
+//阴影衰减
+float GetDirecitonalShadowAttenuation (DirectionalShadowData directional,ShadowData global, Surface surfaceWS){
+    //接受阴影
+    #if !defined(_RECEIVE_SHADOWS)
+		return 1.0;
+	#endif
+    
+    //阴影强度为0时，完全不需要采样，我们有一个无阴影的光源
+	float shadow;
+	if (directional.strength * global.strength <= 0.0) {
+		//现在改为：仅使用烘焙阴影或无阴影
+		shadow =  GetBakedShadow(global.shadowMask, directional.shadowMaskChannel,abs(directional.strength));
+	}   
+	else
+	{
+		shadow = GetCascadedShadow(directional, global, surfaceWS);				//级联阴影
+		shadow = MixBakedAndRealtimeShadows(global, shadow, directional.shadowMaskChannel,directional.strength);	//混合阴影
+	}
+
+	return shadow;
+    
+}
 
 
 

@@ -25,9 +25,10 @@ int GetDirectionalLightCount () {
 //获取定向阴影数据
 DirectionalShadowData GetDirectionalShadowData (int lightIndex, ShadowData shadowData) {
 	DirectionalShadowData data;
-	data.strength = _DirectionalLightShadowData[lightIndex].x * shadowData.strength; //全局阴影强度分解为定向阴影强度
+	data.strength = _DirectionalLightShadowData[lightIndex].x; //全局阴影强度分解为定向阴影强度
 	data.tileIndex = _DirectionalLightShadowData[lightIndex].y + shadowData.cascadeIndex;
     data.normalBias = _DirectionalLightShadowData[lightIndex].z;
+    data.shadowMaskChannel = _DirectionalLightShadowData[lightIndex].w;
 	return data;
 }
 

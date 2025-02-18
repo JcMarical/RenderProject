@@ -89,7 +89,10 @@ public partial class CameraRenderer
         {
             enableDynamicBatching = useDynamicBatching,
             enableInstancing = useGPUInstancing,                            //GPUInstance
-            perObjectData = PerObjectData.Lightmaps | PerObjectData.LightProbe | PerObjectData.LightProbeProxyVolume        //GI设置
+            perObjectData = PerObjectData.Lightmaps | PerObjectData.ShadowMask |    //LightMap
+                PerObjectData.LightProbe | PerObjectData.OcclusionProbe |   //探针
+                PerObjectData.LightProbeProxyVolume |
+                PerObjectData.OcclusionProbeProxyVolume      //LPPVs
         };
 
 
